@@ -403,9 +403,9 @@ class Migration:
         self.rewrite_engine_scripts()
         self.say("")
         if self.apply:
-            self.say("Done. Next: install FennecDesktop-1.0.0-x64.exe and Fennec-plugin-1.0.0.zip,")
-            self.say("then start the IDE once so it republishes the Fennec Air card.")
-            self.say(f"Backups of every edited file sit next to it as *{BACKUP_SUFFIX}.")
+            self.say("Done. Next: install the Fennec desktop app and the Fennec IDE plugin")
+            self.say("for the version you are on, then start the IDE once so it republishes")
+            self.say(f"the Fennec Air card. Backups of every edited file sit next to it as *{BACKUP_SUFFIX}.")
         else:
             self.say("Dry run only. Re-run with --apply to perform these changes.")
         return 0

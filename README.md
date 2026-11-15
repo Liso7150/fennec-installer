@@ -143,12 +143,12 @@ and Gradle are not shipped.
 
 ## Migrating an existing Colibri install
 
-`migrate_rebrand.py` moves a pre-1.4 machine onto the Fennec names in one pass: the
-suite/hub/models folders, `<root>/.cache/colibri-*`, `~/.colibri` → `~/.fennec`,
-`~/.colibri-code` → `~/.fennec-desktop`, the roots inside `config.json`, the legacy
-`acp.registry.colibri` records in Air's overlay and `installed.json`, the `Colibri` picker
-entry, the `air.acp.registry.path` vmoption, and the model path in the engine's local stack
-scripts.
+`migrate_rebrand.py` moves a machine still on the Colibri names onto the Fennec names in
+one pass: the suite/hub/models folders, `<root>/.cache/colibri-*`, `~/.colibri` →
+`~/.fennec`, `~/.colibri-code` → `~/.fennec-desktop`, the roots inside `config.json`, the
+legacy `acp.registry.colibri` records in Air's overlay and `installed.json`, the `Colibri`
+picker entry, the `air.acp.registry.path` vmoption, and the model path in the engine's
+local stack scripts.
 
 ```bash
 python migrate_rebrand.py            # print the plan, change nothing
@@ -168,13 +168,15 @@ rebuilds it.
 > suite (a drive root or `%USERPROFILE%` works) and run that — `cmd.exe` keeps a handle on
 > the running batch file, and the copy also stages the Python script in `%TEMP%`.
 
-Afterwards, install the desktop and plugin artifacts for the version you are on and start
-the IDE once so it republishes the Fennec Air card. Build those artifacts yourself: the
-plugin zip via
+Afterwards, install the desktop app and the IDE plugin for the version you are on and start
+the IDE once so it republishes the Fennec Air card. Build them yourself: the plugin zip via
 [`fennec-jetbrains/build-plugin.sh`](https://github.com/Liso7150/fennec-jetbrains), the
-desktop installer via `npm run dist:exe` in
-[`fennec-desktop`](https://github.com/Liso7150/fennec-desktop) (needs the core repo beside
-it for the native addon). No prebuilt 1.0.0 desktop installer is committed to this suite.
+desktop app via `cargo build --release --offline` in
+[`fennec-desktop`](https://github.com/Liso7150/fennec-desktop) (a native egui binary, needs
+the core repo beside it as a path dependency). Every desktop asset published on GitHub,
+`v0.9.0` included, came from the Electron pipeline — the `0.9.0` note calls it the last
+Electron build. The native Rust app has no published release and no installer wrapper, so
+nothing is prebuilt for it here.
 
 ## Tests
 
