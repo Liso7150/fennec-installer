@@ -150,6 +150,11 @@ def choose_destination(value=None, assume_yes=False, *, interactive=None, home=N
 def default_setup_home():
     if os.environ.get("FENNEC_SETUP_HOME"):
         return Path(os.environ["FENNEC_SETUP_HOME"]).expanduser().resolve()
+    # A suite checkout keeps the hub beside the installer; the home path is the
+    # standalone layout that predates the suite.
+    sibling = Path(__file__).resolve().parent.parent / "fennec-environment-setup"
+    if (sibling / "fennec_setup" / "provision.py").is_file():
+        return sibling
     return Path.home() / "Fennec-Environment-Setup"
 
 

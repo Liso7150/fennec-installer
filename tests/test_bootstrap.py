@@ -20,10 +20,26 @@ import install  # noqa: E402
 
 
 class SetupHomeTests(unittest.TestCase):
+    def env_without_override(self):
+        return {k: v for k, v in os.environ.items() if k != "FENNEC_SETUP_HOME"}
+
     def test_environment_override(self):
         with tempfile.TemporaryDirectory() as directory:
             with mock.patch.dict(os.environ, {"FENNEC_SETUP_HOME": directory}):
                 self.assertEqual(bootstrap.default_setup_home(), Path(directory).resolve())
+
+    def test_suite_sibling_is_the_hub(self):
+        with mock.patch.dict(os.environ, self.env_without_override(), clear=True):
+            home = bootstrap.default_setup_home()
+            self.assertEqual(home.name, "fennec-environment-setup")
+            self.assertEqual(home.parent, ROOT.parent)
+            self.assertTrue((home / "fennec_setup" / "provision.py").is_file())
+
+    def test_standalone_layout_without_a_sibling(self):
+        with mock.patch.dict(os.environ, self.env_without_override(), clear=True), \
+                mock.patch.object(Path, "is_file", return_value=False):
+            self.assertEqual(bootstrap.default_setup_home(),
+                             Path.home() / "Fennec-Environment-Setup")
 
 
 class OutletFlagTests(unittest.TestCase):
