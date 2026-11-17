@@ -13,10 +13,10 @@ from urllib.parse import urlsplit
 SETUP_REPO = "https://github.com/Liso7150/fennec-environment-setup.git"
 ROOT_SUBDIRS = ("engine", "suite", "models", "cache", "setup")
 LAYOUT_HELP = {
-    "engine": "Colibri engine checkout (upstream base idea)",
+    "engine": "Fennec engine checkout: one Rust binary, built with cargo",
     "suite": "suite sources: desktop, core, CLI, plugins, fine-tuning",
     "models": "model weights you add later (nothing is downloaded here)",
-    "cache": "pip / npm / Hugging Face caches",
+    "cache": "pip / Hugging Face caches",
     "setup": "environment setup hub used by this installer",
 }
 
@@ -223,7 +223,7 @@ def choose_features(cs, preselected, assume_yes, *, all_features=False, recommen
     return list(dict.fromkeys(chosen))
 
 
-VERSION = "2.0.0"
+VERSION = "1.0.0"
 
 
 def parser():
@@ -233,7 +233,7 @@ def parser():
     mode.add_argument("--plan", "--dry-run", action="store_true", help="read-only action plan")
     mode.add_argument("--fetch-only", action="store_true", help="sources only, no installs/config writes")
     mode.add_argument("--install", action="store_true", help="fetch and install selected dependencies")
-    ap.add_argument("--build", action="store_true", help="install and build native target, or include build in --plan")
+    ap.add_argument("--build", action="store_true", help="install and build the engine (cargo build --release), or include build in --plan")
     selection = ap.add_mutually_exclusive_group()
     selection.add_argument("--features")
     selection.add_argument("--all", action="store_true")
@@ -241,8 +241,8 @@ def parser():
     ap.add_argument("--setup-home", type=Path)
     ap.add_argument("--manifest", help="alternate trusted manifest")
     ap.add_argument("--root", help="install destination: ROOT/{engine,suite,models,cache,setup}; "
-                                   "prompted on an interactive run when omitted (default ~/Colibri)")
-    ap.add_argument("--drive", help="install into <DRIVE>/Fennec instead of ~/Colibri; "
+                                   "prompted on an interactive run when omitted (default ~/Fennec)")
+    ap.add_argument("--drive", help="install into <DRIVE>/Fennec instead of ~/Fennec; "
                                      "accepts C, C: or E:/Apps/Fennec")
     ap.add_argument("--config")
     for key in ("engine-root", "suite-root", "models-root", "cache-root", "python", "model",
@@ -250,7 +250,6 @@ def parser():
                 "jev-root", "openbot-url"):
         ap.add_argument("--" + key)
     ap.add_argument("--ctx", type=int)
-    ap.add_argument("--native-target", default="fennec")
     ap.add_argument("--update", action="store_true")
     ap.add_argument("--json", action="store_true", help="JSON in --plan mode only")
     return ap

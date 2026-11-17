@@ -15,8 +15,8 @@ runs fine locally.
 
 ## Path A — on the phone (Termux, recommended for a self-contained setup)
 
-Termux gives Android a Linux userspace with Python and a C toolchain. The script
-installs a phone-local core and PWA under `~/Colibri` and installs a single
+Termux gives Android a Linux userspace with Python and a Rust toolchain. The
+script installs a phone-local core and PWA under `~/Fennec` and installs a single
 `fennec-open` command:
 
 ```bash
@@ -32,11 +32,11 @@ screen for an app-like shell.
 What lands on the phone, and nowhere else:
 
 ```
-~/Colibri/engine    Colibri engine checkout
-~/Colibri/suite     fennec-core + coding-agent PWA
-~/Colibri/models    your models (none are downloaded)
-~/Colibri/cache     pip cache
-~/Colibri/setup     setup hub
+~/Fennec/engine      Fennec engine checkout
+~/Fennec/suite       fennec-core + coding-agent PWA
+~/Fennec/models      your models (none are downloaded)
+~/Fennec/cache       pip cache
+~/Fennec/setup       setup hub
 ~/.fennec/config.json
 ```
 
@@ -45,18 +45,17 @@ engine could not start; the rest of the workspace still works. To try on-device
 inference with a small model you already have:
 
 ```bash
-# 1. place a model the engine supports under ~/Colibri/models/<name>
+# 1. place a model the engine supports under ~/Fennec/models/<name>
 # 2. point the shared config at it
 python - <<'PY'
 import json, pathlib
 p = pathlib.Path.home() / ".fennec" / "config.json"
 data = json.loads(p.read_text())
-data["model"] = str(pathlib.Path.home() / "Colibri" / "models" / "<name>")
+data["model"] = str(pathlib.Path.home() / "Fennec" / "models" / "<name>")
 p.write_text(json.dumps(data, indent=2))
 PY
-# 3. fetch the engine sources, then build for that model (ARM build, unverified)
-python ~/fennec-installer/install.py --fetch-only --features inference --yes --root ~/Colibri
-python ~/Colibri/engine/c/coli build --model ~/Colibri/models/<name>
+# 3. build the engine for ARM (unverified on-device build)
+cd ~/Fennec/engine && cargo build --release
 ```
 
 Do not point this at the 35B model.

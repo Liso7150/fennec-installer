@@ -89,7 +89,7 @@ def download_asset(url: str, expected_checksum: Optional[str] = None) -> bytes:
 
 
 def update(experimental: bool = False) -> str:
-    current = "1.0.0"  # TODO: read from __version__
+    from bootstrap import VERSION as current
     
     if experimental:
         print("[update] Checking experimental channel (master branch)...")
