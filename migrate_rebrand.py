@@ -42,6 +42,10 @@ REPO_DIRS = {
 PACKAGE_DIRS = {
     "colibri_setup": "fennec_setup",
     "colibri_cli": "fennec_cli",
+    # Today's fennec-core has no package directory - its modules sit at the repo
+    # root - so this pair rewrites the identifier where it appears in a legacy
+    # checkout's text, and the layout itself comes from `fennec update` or a
+    # fresh clone. Reorganising a package is outside what this script does.
     "colibri_core": "fennec_core",
 }
 CACHE_DIRS = {

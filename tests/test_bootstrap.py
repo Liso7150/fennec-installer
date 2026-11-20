@@ -27,12 +27,35 @@ class SetupHomeTests(unittest.TestCase):
 
 
 class OutletFlagTests(unittest.TestCase):
+    # Mirrors fennec-environment-setup's fennec_setup.config.KEYS (golden there is
+    # KeysTests.test_shared_key_set). plan_from_args reads overrides as
+    # getattr(args, key, None) for every key, so a key without a flag here is quietly
+    # unsettable from the installer instead of an error.
+    SHARED_KEYS = {"engine_root", "suite_root", "models_root", "cache_root", "python",
+                   "model", "engine_url", "web_root", "workspace", "backend", "ctx",
+                   "policy", "openbot_url", "web_python"}
+
     def test_outlet_overrides_reach_the_hub_as_keys(self):
         args = bootstrap.parser().parse_args([
-            "--plan", "--features", "browser-outlets", "--jev-root", "~/my-jev",
-            "--openbot-url", "http://127.0.0.1:3001"])
-        self.assertEqual(args.jev_root, "~/my-jev")
+            "--plan", "--features", "browser-outlets",
+            "--openbot-url", "http://127.0.0.1:3001",
+            "--web-python", "~/browsenv/python"])
         self.assertEqual(args.openbot_url, "http://127.0.0.1:3001")
+        self.assertEqual(args.web_python, "~/browsenv/python")
+
+    def test_the_deleted_lane_has_no_flags_left_to_mistake_for_live(self):
+        # argparse maps an unknown --x to AttributeError-free SystemExit(2), so refusing
+        # is what proves the installer cannot offer a setting the core no longer reads.
+        for flag in ("--jev-root", "~/my-jev", "--web-engine", "fennec"):
+            with self.subTest(flag=flag):
+                with self.assertRaises(SystemExit) as caught:
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        bootstrap.parser().parse_args(["--plan", "--all", flag])
+                self.assertEqual(caught.exception.code, 2)
+
+    def test_every_shared_key_can_be_pinned_from_the_command_line(self):
+        args = bootstrap.parser().parse_args(["--plan", "--all"])
+        self.assertEqual(sorted(key for key in self.SHARED_KEYS if not hasattr(args, key)), [])
 
     def test_version_is_1_9_0(self):
         self.assertEqual(bootstrap.VERSION, "1.0.0")

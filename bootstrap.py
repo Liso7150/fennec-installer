@@ -247,7 +247,7 @@ def parser():
     ap.add_argument("--config")
     for key in ("engine-root", "suite-root", "models-root", "cache-root", "python", "model",
                 "engine-url", "web-root", "workspace", "backend", "policy",
-                "jev-root", "openbot-url"):
+                "openbot-url", "web-python"):
         ap.add_argument("--" + key)
     ap.add_argument("--ctx", type=int)
     ap.add_argument("--update", action="store_true")

@@ -13,10 +13,10 @@ drives its plan/fetch/install pipeline.
 - Install destination selection: an interactive drive picker (`--drive E` -> `E:/Fennec`) or any folder (`--root`). — repos, models, caches and config stay on the device.
 - Plan / fetch / install / build actions; the installer never downloads models or starts a server.
 - `--update` fast-forwards every installed clean Fennec checkout from GitHub (local
-  work is never reset, and the upstream engine, Jev and OpenBot checkouts are left
+  work is never reset, and the upstream OpenBot checkout is left
   for you to update deliberately).
 - Termux on Android installs the local core + PWA on the phone; Android and iOS browsers are PWA clients.
-- `browser-outlets` clones [Jev](https://github.com/browser-use/jev-ultrafast) and [OpenBot](https://github.com/CopilotKit/OpenBot) beside the suite and stops there: no dependencies installed, no patches, nothing started. The shared core drives both, and `--jev-root` / `--openbot-url` point at a checkout or server you already have.
+- `browser-outlets` clones [OpenBot](https://github.com/CopilotKit/OpenBot) beside the suite and stops there: no dependencies installed, no patches, nothing started. `--openbot-url` points at a workspace you already run. `web_task` needs no checkout — it is Fennec's own loop, which asks a Liquid **d1** model one question per step, so it wants an endpoint to ask - a `LIQUID_API_KEY` for the hosted `d1.2`, or a `LIQUID_ENDPOINT` for the free local `d1-2B` - plus an interpreter that can import `browser_harness.helpers`. This feature installs that interpreter: a venv of the lane's own at `~/.fennec/browser-tools/fennec/.venv` with the pinned transport in it, never in the interpreter the apps run on. `--web-python` pins a different one.
 
 ## Run
 
@@ -27,7 +27,7 @@ python install.py --all --yes                               # fetch everything
 python install.py --update --yes                            # update installed checkouts
 python install.py --install --features inference,desktop --yes
 python install.py --install --features inference --build --yes
-python install.py --features browser-outlets --yes          # clone Jev + OpenBot only
+python install.py --features browser-outlets --yes          # clone OpenBot, fill Fennec's own browser env
 python bootstrap.py --plan --all                            # read-only plan
 ```
 
@@ -139,7 +139,11 @@ python -m unittest discover -s tests -v
 
 Engine base idea: [JustVugg/colibri](https://github.com/JustVugg/colibri) —
 device-tiered MoE inference. Fine-tuning:
-[AirLLM](https://github.com/lyogavin/airllm). Browser outlets:
-[browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) and
-[CopilotKit/OpenBot](https://github.com/CopilotKit/OpenBot), both used exactly as
-upstream and never modified or vendored.
+[AirLLM](https://github.com/lyogavin/airllm). Coworker outlet:
+[CopilotKit/OpenBot](https://github.com/CopilotKit/OpenBot), used exactly as
+upstream and never modified or vendored. Browser policy: Liquid
+[d1](https://api.liquid.ai/decisions/v1/systemone) family: the hosted `d1.2`, a paid API the
+core calls over HTTPS, or the free open-weight `d1-2B` answered by a model server on
+loopback — nothing is cloned or installed for either. Browser transport:
+[browser-harness](https://github.com/browser-use/browser-harness), the CDP driver
+`browser-outlets` pip-installs into Fennec's own browser venv.
