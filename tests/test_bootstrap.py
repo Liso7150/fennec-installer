@@ -20,10 +20,26 @@ import install  # noqa: E402
 
 
 class SetupHomeTests(unittest.TestCase):
+    def env_without_override(self):
+        return {k: v for k, v in os.environ.items() if k != "FENNEC_SETUP_HOME"}
+
     def test_environment_override(self):
         with tempfile.TemporaryDirectory() as directory:
             with mock.patch.dict(os.environ, {"FENNEC_SETUP_HOME": directory}):
                 self.assertEqual(bootstrap.default_setup_home(), Path(directory).resolve())
+
+    def test_suite_sibling_is_the_hub(self):
+        with mock.patch.dict(os.environ, self.env_without_override(), clear=True):
+            home = bootstrap.default_setup_home()
+            self.assertEqual(home.name, "fennec-environment-setup")
+            self.assertEqual(home.parent, ROOT.parent)
+            self.assertTrue((home / "fennec_setup" / "provision.py").is_file())
+
+    def test_standalone_layout_without_a_sibling(self):
+        with mock.patch.dict(os.environ, self.env_without_override(), clear=True), \
+                mock.patch.object(Path, "is_file", return_value=False):
+            self.assertEqual(bootstrap.default_setup_home(),
+                             Path.home() / "Fennec-Environment-Setup")
 
 
 class OutletFlagTests(unittest.TestCase):
@@ -57,7 +73,7 @@ class OutletFlagTests(unittest.TestCase):
         args = bootstrap.parser().parse_args(["--plan", "--all"])
         self.assertEqual(sorted(key for key in self.SHARED_KEYS if not hasattr(args, key)), [])
 
-    def test_version_is_1_9_0(self):
+    def test_version_is_1_0_0(self):
         self.assertEqual(bootstrap.VERSION, "1.0.0")
 
 

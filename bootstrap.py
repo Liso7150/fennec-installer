@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 SETUP_REPO = "https://github.com/Liso7150/fennec-environment-setup.git"
 ROOT_SUBDIRS = ("engine", "suite", "models", "cache", "setup")
 LAYOUT_HELP = {
-    "engine": "Fennec engine checkout: one Rust binary, built with cargo",
+    "engine": "Fennec engine checkout (Rust; cargo build --release)",
     "suite": "suite sources: desktop, core, CLI, plugins, fine-tuning",
     "models": "model weights you add later (nothing is downloaded here)",
     "cache": "pip / Hugging Face caches",
@@ -150,6 +150,11 @@ def choose_destination(value=None, assume_yes=False, *, interactive=None, home=N
 def default_setup_home():
     if os.environ.get("FENNEC_SETUP_HOME"):
         return Path(os.environ["FENNEC_SETUP_HOME"]).expanduser().resolve()
+    # A suite checkout keeps the hub beside the installer; the home path is the
+    # standalone layout that predates the suite.
+    sibling = Path(__file__).resolve().parent.parent / "fennec-environment-setup"
+    if (sibling / "fennec_setup" / "provision.py").is_file():
+        return sibling
     return Path.home() / "Fennec-Environment-Setup"
 
 
@@ -233,7 +238,7 @@ def parser():
     mode.add_argument("--plan", "--dry-run", action="store_true", help="read-only action plan")
     mode.add_argument("--fetch-only", action="store_true", help="sources only, no installs/config writes")
     mode.add_argument("--install", action="store_true", help="fetch and install selected dependencies")
-    ap.add_argument("--build", action="store_true", help="install and build the engine (cargo build --release), or include build in --plan")
+    ap.add_argument("--build", action="store_true", help="install and build the engine (cargo build --release), or include the build in --plan")
     selection = ap.add_mutually_exclusive_group()
     selection.add_argument("--features")
     selection.add_argument("--all", action="store_true")
@@ -302,7 +307,7 @@ def main(argv=None):
         if args.update and not (args.features or args.all):
             count = update_installed(manifest, root=args.root, config=args.config,
                                      overrides={key: getattr(args, key, None) for key in KEYS})
-            print(f"Updated {count} checkout(s). Rebuild any artifacts you distribute; the engine checkout is never moved implicitly.")
+            print(f"Updated {count} checkout(s). Rebuild any artifacts you distribute (cargo build --release for the engine); upstream outlet checkouts are never moved implicitly.")
             return 0
         if args.features or args.all:
             features = selected_features(manifest, args.features, args.all)
