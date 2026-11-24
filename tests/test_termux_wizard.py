@@ -1,4 +1,7 @@
+import json
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -20,12 +23,51 @@ class TermuxWizardTests(unittest.TestCase):
         self.assertIsNotNone(body, "the wizard no longer writes open-fennec.sh")
         return body.group(1).replace('\\"', '"').replace("\\$", "$")
 
-    def test_the_rust_agent_is_the_front_door_on_its_own_ports(self):
+    def test_the_core_is_the_front_door_and_rust_is_optional_auxiliary(self):
         start = self.start_script()
-        self.assertIn("fennec-coding-agent/target/release/fennec-agent", SCRIPT)
-        self.assertIn("8787 8788", start)
-        self.assertNotIn("server.py", SCRIPT)
+        self.assertIn('CORE_AGENT="$PREFIX/bin/fennec-agent"', start)
+        self.assertIn('"$CORE_AGENT" serve --host 127.0.0.1 --port 8787 &', start)
+        self.assertIn('RUST_AGENT="$ROOT/suite/fennec-coding-agent/target/release/fennec-agent"', start)
+        self.assertIn('if [ -x "$RUST_AGENT" ]; then', start)
+        self.assertIn('FENNEC_AGENT_ADDR=127.0.0.1:8788 "$RUST_AGENT" &', start)
+        self.assertIn('termux-open-url "http://127.0.0.1:8787/"', start)
+        self.assertIn('http://127.0.0.1:8787/api/capabilities', start)
+        self.assertIn('X-Fennec-Client: 1', start)
+        self.assertNotIn("$PORT", start)
+        self.assertNotIn("for candidate", start)
+        self.assertNotIn("/api/health", start)
         self.assertNotIn("npm", SCRIPT)
+
+    def test_the_capability_gate_requires_every_supervised_feature(self):
+        start = self.start_script()
+        checker = re.search(r"python -c '([^']+)'", start, re.S)
+        self.assertIsNotNone(checker, "the readiness gate no longer validates capabilities JSON")
+        required = {"supervised-agent", "tool-execution", "per-call-approvals", "agent-polling"}
+
+        def check(payload):
+            return subprocess.run([sys.executable, "-c", checker.group(1)],
+                                  input=payload, capture_output=True, text=True)
+
+        self.assertEqual(check(json.dumps({"features": sorted(required)})).returncode, 0)
+        for missing in sorted(required):
+            with self.subTest(missing=missing):
+                features = sorted(required - {missing})
+                self.assertNotEqual(check(json.dumps({"features": features})).returncode, 0)
+        for malformed in ("not json", "[]", '{"features": null}',
+                          '{"features": "supervised-agent"}'):
+            with self.subTest(malformed=malformed):
+                self.assertNotEqual(check(malformed).returncode, 0)
+        self.assertIn("refusing a chat-only fallback", start)
+
+    def test_cleanup_tracks_each_same_named_agent_by_its_own_pid(self):
+        start = self.start_script()
+        for pid in ("CORE_AGENT_PID", "RUST_AGENT_PID", "ENGINE_PID"):
+            with self.subTest(pid=pid):
+                self.assertIn(f'kill "${pid}"', start)
+                self.assertIn(f'wait "${pid}"', start)
+        self.assertNotIn('kill "$AGENT_PID"', start)
+        self.assertNotIn("pkill", start.lower())
+        self.assertNotIn("pgrep", start.lower())
 
     def test_the_engine_is_served_directly_on_loopback_8184(self):
         start = self.start_script()

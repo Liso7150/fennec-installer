@@ -14,8 +14,10 @@ and the shared runtime config written.
 
 The engine is Fennec (https://github.com/Liso7150/fennec), the suite's only engine:
 a native Rust binary built with `cargo build --release` and launched directly.
-The desktop is the native Rust/GPUI `fennec-desktop-gui` window, and the PWA/API
-front door is the Rust/Axum `fennec-agent` from fennec-coding-agent.
+The desktop is the native Rust/GPUI `fennec-desktop-gui` window. The core-supervised
+PWA/API front door is `fennec-core/server.py`, launched by the installed Python
+`fennec-agent serve` on 127.0.0.1:8787; the Rust `fennec-agent` from
+fennec-coding-agent is an auxiliary/chat service on 127.0.0.1:8788.
 
 Credits: the engine's base idea is Colibri (https://github.com/JustVugg/colibri);
 fine-tuning uses AirLLM (https://github.com/lyogavin/airllm).
