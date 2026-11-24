@@ -63,6 +63,10 @@ HUB_NAMES = ("Colibri-Enviorment-Setup", "Colibri-Environment-Setup")
 # Fennec first, Colibri as the legacy fallback: neither engine root is ever
 # renamed or rewritten, only recognised so its stack scripts can be fixed.
 ENGINE_DIRS = ("Fennec", "Colibri")
+# The names a pre-Fennec engine checkout used. engine_kind() is a fallback, not a
+# detector, so the config repoint below is keyed on the name: a root the user chose
+# deliberately is left alone.
+LEGACY_ENGINE_NAMES = ("colibri", "colibri-new", "colibri-code", "colibricode")
 BACKUP_SUFFIX = ".bak-fennec-rebrand"
 LEGACY_AGENT_ID = "colibri"
 LEGACY_INSTALL_KEY = "acp.registry.colibri"
@@ -169,6 +173,29 @@ def replacements(roots: Roots) -> list[tuple[str, str]]:
         add(name, "Fennec-Environment-Setup")
     add(".colibri", ".fennec")
     return pairs
+
+
+def repoint_legacy_engine(data: dict, roots: "Roots") -> bool:
+    """Move a config that still names a Colibri checkout onto the Fennec root.
+
+    replacements() never touches an engine root: renaming Colibri to Fennec there
+    would also rewrite the upstream credit. But the engine is no longer a path
+    detail a migration can leave alone - Fennec is the only one the suite runs - so
+    this one key is rewritten by name, and only when a real Fennec root exists.
+    """
+    saved = data.get("engine_root")
+    if not isinstance(saved, str) or not saved.strip():
+        return False
+    name = saved.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].lower()
+    if name not in LEGACY_ENGINE_NAMES or not roots.engine.is_dir():
+        return False
+    if engine_kind(roots.engine) != "fennec":
+        return False
+    target = str(roots.engine).replace("\\", "/")
+    if target == saved:
+        return False
+    data["engine_root"] = target
+    return True
 
 
 def rewrite(text: str, pairs: list[tuple[str, str]]) -> str:
@@ -301,6 +328,10 @@ class Migration:
             if not isinstance(data, dict):
                 return False
             updated = rewrite_json(data, pairs)
+            saved_engine = updated.get("engine_root")
+            if repoint_legacy_engine(updated, self.roots):
+                self.say(f"  engine_root {saved_engine} -> "
+                         f"{updated['engine_root']} (Fennec is the only engine)")
             if updated == data:
                 return False
             data.clear()
@@ -396,7 +427,12 @@ class Migration:
         os.chdir(tempfile.gettempdir())
         self.say(f"Fennec rebrand migration ({'apply' if self.apply else 'dry run'})")
         self.say(f"  suite  {self.roots.suite} -> {self.roots.new_suite}")
-        self.say(f"  engine {self.roots.engine} ({engine_kind(self.roots.engine)}; kept, never renamed)")
+        kind = engine_kind(self.roots.engine)
+        self.say(f"  engine {self.roots.engine} ({kind}; kept, never renamed)")
+        if kind != "fennec":
+            self.say("  warn   no Fennec checkout found beside the suite, so a config that names a"
+                     " Colibri root stays there. Fennec is the only engine the suite runs: clone it"
+                     " next to the suite, then re-run --apply so the config follows.")
         if not self.rename_folders():
             self.say("")
             self.say("Stopped: a folder is locked. Close Qoder and every JetBrains IDE,")

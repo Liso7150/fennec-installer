@@ -305,6 +305,77 @@ class FennecEngineTests(unittest.TestCase):
         (legacy / "c/coli").write_text("# launcher\n", encoding="utf-8")
         self.assertEqual(migrate.engine_kind(legacy), "colibri")
 
+    def set_engine_root(self, value):
+        path = self.home / ".colibri/config.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["engine_root"] = value
+        write_json(path, data)
+
+    def test_a_config_naming_a_colibri_checkout_moves_to_the_fennec_root(self):
+        self.set_engine_root("D:/Colibri")
+        code, output = self.run_migration()
+        self.assertEqual(code, 0)
+        data = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["engine_root"], str(self.engine).replace("\\", "/"))
+        self.assertIn("Fennec is the only engine", output)
+
+    def test_the_legacy_checkout_folder_names_move_too(self):
+        for saved in ("D:/colibri-new", "D:\\Colibri-Code", "~/colibricode"):
+            with self.subTest(saved=saved):
+                self.setUp()  # each value needs a pre-migration layout
+                self.set_engine_root(saved)
+                self.run_migration()
+                data = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+                self.assertEqual(data["engine_root"], str(self.engine).replace("\\", "/"), saved)
+
+    def test_a_deliberately_chosen_engine_root_is_left_alone(self):
+        # engine_kind() answers "is this a Fennec tree", not "is this our engine", so a
+        # root the user picked by hand survives: repointing it would be a guess.
+        self.set_engine_root("D:/Tools/my-engine")
+        code, output = self.run_migration()
+        self.assertEqual(code, 0)
+        data = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["engine_root"], "D:/Tools/my-engine")
+        self.assertNotIn("engine_root", output)
+
+    def test_repointing_is_idempotent(self):
+        self.set_engine_root("D:/Colibri")
+        self.run_migration()
+        code, output = self.run_migration()
+        self.assertEqual(code, 0)
+        self.assertNotIn("engine_root", output)
+        data = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["engine_root"], str(self.engine).replace("\\", "/"))
+
+    def test_the_python_key_stays_where_the_interpreter_is(self):
+        # The engine is a Rust binary; `python` names an interpreter other tooling uses,
+        # so the repoint deliberately moves only the engine, never the interpreter.
+        self.set_engine_root("D:/Colibri")
+        path = self.home / ".colibri/config.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["python"] = "D:/Colibri/.venv/Scripts/python.exe"
+        write_json(path, data)
+        self.run_migration()
+        after = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(after["python"], "D:/Colibri/.venv/Scripts/python.exe")
+
+    def test_a_colibri_only_machine_says_the_config_cannot_move(self):
+        legacy = self.base / "Colibri"
+        (legacy / "c").mkdir(parents=True)
+        roots = migrate.Roots(
+            suite=self.suite, new_suite=self.base / "Fennec-Suite",
+            models=self.models, new_models=self.base / "fennec-models",
+            cache=self.base / ".cache", engine=legacy, home=self.home,
+            roaming=self.roots.roaming, local=self.roots.local,
+        )
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = migrate.Migration(roots, apply=True).run()
+        self.assertEqual(code, 0)
+        self.assertIn("no Fennec checkout", out.getvalue())
+        data = json.loads((self.home / ".fennec/config.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["engine_root"], "D:/Fennec")
+
     def test_discover_prefers_fennec_and_falls_back_to_colibri(self):
         legacy = self.base / "Colibri"
         legacy.mkdir()
