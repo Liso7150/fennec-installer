@@ -1,4 +1,4 @@
-![Fennec Installer 1.0.0 — one command to bootstrap the whole Fennec environment: pick a destination, choose features, fetch and provision, a thin shim over the environment-setup hub. Python 3.10+, 50 tests, Windows macOS Linux, MIT license.](docs/hero.png)
+![Fennec Installer 1.0.0 — one command to bootstrap the whole Fennec environment: pick a destination, choose features, fetch and provision, a thin shim over the environment-setup hub. Python 3.10+, 70 tests, Windows macOS Linux, MIT license.](docs/hero.png)
 
 ---
 
@@ -6,7 +6,7 @@
 
 | Tests | Entry scripts | Exclusive modes | Layout dirs | Features (hub manifest) |
 |:---:|:---:|:---:|:---:|:---:|
-| 50 in 2 files | 4 | 3 (+ `--build` / `--update`) | 5 | 10 |
+| 70 in 3 files | 4 | 3 (+ `--build` / `--update`) | 5 | 10 |
 
 Counts from `tests/`, the four scripts with a `__main__` entry and the hub's `repos.json`.
 Device detection, dependency installation, engine builds and checkout updates all live in the
@@ -69,7 +69,7 @@ python bootstrap.py --plan --all                            # read-only plan
 | `--fetch-only` | clone or verify checkouts (the `install.py` default) |
 | `--install` | fetch, then provision dependencies and write the config |
 | `--build` | additionally `cargo build --release` the engine (implies `--install`) |
-| `--update` | `git pull --ff-only` on installed clean checkouts |
+| `--update` | `git pull --ff-only` on installed clean checkouts, including the engine checkout (`ROOT/engine`, [Liso7150/fennec](https://github.com/Liso7150/fennec)) |
 | `--json` | machine-readable output (`--plan` only) |
 
 `--plan`, `--fetch-only` and `--install` are mutually exclusive; `--build` cannot be
@@ -101,16 +101,18 @@ ROOT/setup    environment setup hub used by this installer
 ```
 
 `--yes` keeps the default roots (`~/Fennec`, `~/Fennec-Suite`, `~/fennec-models`,
-`~/.cache/fennec` on a fresh machine) or any roots passed explicitly. An existing
-`~/Colibri` engine checkout is the fallback engine root when nothing chose one, and a
-config that already points at a Colibri root keeps it. The shared config
+`~/.cache/fennec` on a fresh machine) or any roots passed explicitly. Fennec is the only
+engine: a leftover `~/Colibri` checkout is never chosen as an engine root, and a config
+that names one is migrated to the Fennec default. The shared config
 `~/.fennec/config.json` is the one small file written outside the chosen root, because
 every Fennec app reads it.
 
-`--build` runs `cargo build --release` in `ROOT/engine`; the plan reports a missing `cargo`
-as a requirement. The resulting `target/release/fennec(.exe)` is launched directly, with no
-Python in front of it. A legacy Colibri root still builds through its `c/Makefile` /
-`c/coli` launcher instead.
+`--build` runs `cargo build --release` in `ROOT/engine`, `cargo build --release` for the
+CLI and the coding-agent backend, and `cargo build --release --features gui --bin
+fennec-desktop-gui` for the desktop; the plan reports a missing `cargo` as a requirement.
+The resulting `target/release/fennec(.exe)` is launched directly, with no Python in front
+of it. On Windows the release GPUI window additionally needs `fxc.exe` from the Windows
+SDK; without it, build the debug window (`cargo build --features gui`).
 
 ## Device detection
 
@@ -173,10 +175,10 @@ python migrate_rebrand.py --apply    # perform it
 
 It is idempotent and stops at the first locked folder without rewriting any config, so a
 failed run is safe to repeat. Every edited file keeps a `*.bak-fennec-rebrand` backup beside
-it. The engine checkout is deliberately untouched — a Fennec root is recognised and
-preserved exactly like the legacy `~/Colibri` with its `COLI_*` variables and `c/coli` entry
-point. The stale desktop code index is retired rather than rewritten so the sidecar
-rebuilds it.
+it. The engine checkout is deliberately untouched — a legacy Colibri root is carried
+through the rename like any other folder and is never launched afterwards; Fennec is the
+only engine the suite runs. The stale desktop code index is retired rather than rewritten
+so the sidecar rebuilds it.
 
 > [!WARNING]
 > Close Qoder and every JetBrains IDE first: Windows refuses to rename a directory while a
@@ -197,7 +199,7 @@ app via `cargo build --release --offline` in
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v     # 50 checks across 2 files
+python -m unittest discover -s tests -v     # 70 checks across 3 files
 ```
 
 Hermetic: temporary directories and mocks, no network client calls, no downloads, no
@@ -209,13 +211,16 @@ directory and skip when git is absent; none of them fetch.
 Engine: [Liso7150/fennec](https://github.com/Liso7150/fennec) — one native Rust engine
 (`serve` / `run` / `info` / `plan` / `doctor`, OpenAI-compatible HTTP on `127.0.0.1:8184`).
 Base idea: [JustVugg/colibri](https://github.com/JustVugg/colibri) — device-tiered MoE
-inference, still supported as the legacy `c/coli` fallback. Fine-tuning:
+inference (historical credit only; no Colibri checkout is launched, built or fetched).
+Fine-tuning:
 [AirLLM](https://github.com/lyogavin/airllm). Coworker outlet:
 [CopilotKit/OpenBot](https://github.com/CopilotKit/OpenBot), used exactly as upstream and never
 modified or vendored. Browser policy: Liquid
 [d1](https://api.liquid.ai/decisions/v1/systemone) family — the hosted `d1.2`, a paid API the
-core calls over HTTPS, or the free open-weight `d1-2B` answered by a model server on loopback;
-nothing is cloned or installed for either. Browser transport:
+core calls over HTTPS, or the free open-weight `d1-2B` answered by a System One-compatible
+model server on loopback — the hosted half needs only a key, the loopback half needs that
+server to already be running (Fennec's own engine serves `/v1/chat/completions`, not
+`/v1/systemone`); nothing is cloned or installed for either by the installer. Browser transport:
 [browser-harness](https://github.com/browser-use/browser-harness), the CDP driver
 `browser-outlets` pip-installs into Fennec's own browser venv. Part of the
 [Fennec suite](https://github.com/Liso7150/fennec-environment-setup).

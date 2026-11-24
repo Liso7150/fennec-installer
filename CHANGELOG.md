@@ -10,10 +10,17 @@ same commit as a published `v0.x` tag. Dates are the tag publish dates.
 
 ## [Unreleased] — 1.0.0 in preparation
 
-Nothing at 1.0.0 is published. The newest release here is `v0.9.0`
-(2026-11-11T19:29Z). Measured on the working tree: 50 tests passed plus 10
-subtests (`python -m pytest -q`, 2026-11-21; the hub's `installer` lane runs
-`python -m unittest discover -s tests` and reports the same 50).
+Nothing at 1.0.0 is published (`bootstrap.py` carries `VERSION = "1.0.0"`); the
+newest release here is `v0.9.0` (2026-11-11T19:29Z). Test counts come from the
+results hub (`benchmarks/artifacts/hub/RESULTS.json`, updated
+2026-11-24T07:29:28Z): its `installer` lane runs
+`python -m unittest discover -s tests` and reports **70 passed / 0 failed / 0
+skipped** (measured 2026-11-24T05:47:01Z) — re-measured in this session with that
+same command: `Ran 70 tests … OK`. The hub's unittest parser reads `Ran N tests`
+and carries no subtest figure, so none is quoted here; the pytest run of the same
+tree gives `70 passed, 26 subtests passed`. An earlier revision of this file said
+50 passed plus 10 subtests, and that number was stale. Suite-wide totals live in
+the hub, not here.
 
 ### Added
 - `updater.py`: self-update from the GitHub releases of this repo, with
@@ -34,6 +41,10 @@ subtests (`python -m pytest -q`, 2026-11-21; the hub's `installer` lane runs
 
 ### Fixed
 - The bootstrap test assertion that no longer matched the bootstrap
+- `python updater.py --help` ran the update instead of describing it: the entry
+  point tested only for `--experimental` and ignored every other argument, so a
+  conventional help flag reached the network and the `.new` write. `-h` and
+  `--help` now print the usage and exit before `update()` is called
 
 ## [0.9.0] - 2026-11-11
 

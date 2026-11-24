@@ -88,14 +88,14 @@ build it you need the Android SDK + Gradle; this repo ships source, not an APK:
 - Termux phone-local core + PWA: script provided; core install validated by
   unit tests, not on a physical phone in CI.
 - On-device engine inference: unverified ARM build; small models only.
-- PWA install: supported and verified in desktop Chrome; engine auto-start on
-  send is covered by the core API.
+- PWA install: supported and verified in desktop Chrome; the engine is started
+  explicitly (`fennec serve` or `open-fennec.sh`), never silently by the UI.
 - WebView activity: source scaffold provided.
 - CI APK build / Play packaging: **not implemented** (roadmap).
 
 Engine: [Liso7150/fennec](https://github.com/Liso7150/fennec) (native Rust,
-`cargo build --release`). Engine base idea:
-[JustVugg/colibri](https://github.com/JustVugg/colibri), whose `c/coli` launcher
-remains the legacy fallback. Setup:
+`cargo build --release`) — the suite's only engine. Engine base idea:
+[JustVugg/colibri](https://github.com/JustVugg/colibri) (historical credit only).
+Setup:
 [fennec-environment-setup](https://github.com/Liso7150/fennec-environment-setup).
 Training: [AirLLM](https://github.com/lyogavin/airllm).
