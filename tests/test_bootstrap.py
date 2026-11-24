@@ -41,6 +41,90 @@ class SetupHomeTests(unittest.TestCase):
             self.assertEqual(bootstrap.default_setup_home(),
                              Path.home() / "Fennec-Environment-Setup")
 
+    def clone(self, home, name):
+        provision = home / name / "fennec_setup" / "provision.py"
+        provision.parent.mkdir(parents=True)
+        provision.write_text("# hub\n", encoding="utf-8")
+        return home / name
+
+    def hub(self, home):
+        with mock.patch.dict(os.environ, self.env_without_override(), clear=True):
+            return bootstrap.default_setup_home(home=home, here=home / "nowhere")
+
+    def test_a_lowercase_home_clone_is_used_before_the_capitalized_default(self):
+        # Linux and macOS compare names case-sensitively: probing only the capitalized
+        # spelling would clone a second hub beside the existing one.
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clone = self.clone(home, "fennec-environment-setup")
+            self.assertEqual(self.hub(home), clone)
+
+    def test_a_capitalized_home_clone_is_always_found(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            clone = self.clone(home, "Fennec-Environment-Setup")
+            self.assertEqual(self.hub(home), clone)
+
+    def test_a_bare_name_is_not_a_hub(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            (home / "fennec-environment-setup").mkdir()
+            self.assertEqual(self.hub(home), home / "Fennec-Environment-Setup")
+
+    def test_the_suite_sibling_beats_a_home_clone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            suite = base / "suite"
+            clone = self.clone(suite, "fennec-environment-setup")
+            self.clone(base / "home", "fennec-environment-setup")
+            with mock.patch.dict(os.environ, self.env_without_override(), clear=True):
+                home = bootstrap.default_setup_home(home=base / "home", here=suite)
+            self.assertEqual(home, clone)
+
+
+class DriveDestinationTests(unittest.TestCase):
+    def test_a_letter_resolves_to_the_default_folder_on_that_drive(self):
+        for value in ("E", "e", "E:", "E:/", "E:\\"):
+            with self.subTest(value=value):
+                with mock.patch.object(bootstrap, "validate_destination",
+                                       side_effect=lambda raw, **_: raw) as checked:
+                    self.assertEqual(bootstrap.drive_destination(value), "E:/Fennec")
+                self.assertEqual(checked.call_args.args[0], "E:/Fennec")
+
+    def test_a_folder_path_is_passed_through(self):
+        with mock.patch.object(bootstrap, "validate_destination",
+                               side_effect=lambda raw, **_: raw):
+            self.assertEqual(bootstrap.drive_destination("E:/Apps/Fennec"), "E:/Apps/Fennec")
+
+    def off_windows(self):
+        # Patching os.name on the real module makes pathlib refuse to build a Path.
+        return mock.patch.object(bootstrap, "os",
+                                 types.SimpleNamespace(name="posix", path=os.path,
+                                                       access=os.access, environ=os.environ,
+                                                       W_OK=os.W_OK))
+
+    def test_a_drive_letter_is_refused_off_windows(self):
+        # Without the guard "E" became "/E/Fennec", and the install landed at the root.
+        with self.off_windows():
+            with self.assertRaises(ValueError) as caught:
+                bootstrap.drive_destination("E")
+        message = str(caught.exception)
+        self.assertIn("Windows drive letter", message)
+        self.assertIn("~/Fennec", message)
+        self.assertIn("/mnt/e/Fennec", message)
+
+    def test_a_folder_path_still_works_off_windows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.off_windows():
+                chosen = bootstrap.drive_destination(Path(directory) / "Fennec")
+            self.assertEqual(chosen, (Path(directory) / "Fennec").resolve())
+
+    def test_empty_input_is_refused(self):
+        for value in ("", "   ", "//"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    bootstrap.drive_destination(value)
+
 
 class OutletFlagTests(unittest.TestCase):
     # Mirrors fennec-environment-setup's fennec_setup.config.KEYS (golden there is

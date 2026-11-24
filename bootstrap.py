@@ -48,9 +48,12 @@ def drive_destination(value, *, folder="Fennec", home=None):
     if not raw:
         raise ValueError("Choose a drive letter or a folder")
     if len(raw) == 1 and raw.isalpha():
-        raw = f"{raw}:"
+        if os.name != "nt":
+            raise ValueError(f"{raw!r} is a Windows drive letter; on this system give a "
+                             f"folder path, for example ~/Fennec or /mnt/{raw.lower()}/{folder}")
+        raw = f"{raw.upper()}:"
     if len(raw) == 2 and raw[1] == ":":
-        return validate_destination(f"{raw}/{folder}", home=home)
+        return validate_destination(f"{raw.upper()}/{folder}", home=home)
     return validate_destination(raw, home=home)
 
 
@@ -147,15 +150,22 @@ def choose_destination(value=None, assume_yes=False, *, interactive=None, home=N
             return chosen
 
 
-def default_setup_home():
+def default_setup_home(home=None, here=None):
     if os.environ.get("FENNEC_SETUP_HOME"):
         return Path(os.environ["FENNEC_SETUP_HOME"]).expanduser().resolve()
-    # A suite checkout keeps the hub beside the installer; the home path is the
-    # standalone layout that predates the suite.
-    sibling = Path(__file__).resolve().parent.parent / "fennec-environment-setup"
+    home = Path(home or Path.home())
+    # A suite checkout keeps the hub beside the installer; the home paths are the
+    # standalone layout that predates the suite. Linux compares names case
+    # sensitively, so both spellings are probed before falling back: missing the
+    # lowercase clone would fetch a second hub next to the first.
+    sibling = Path(here or Path(__file__).resolve().parent.parent) / "fennec-environment-setup"
     if (sibling / "fennec_setup" / "provision.py").is_file():
         return sibling
-    return Path.home() / "Fennec-Environment-Setup"
+    for name in ("fennec-environment-setup", "Fennec-Environment-Setup"):
+        candidate = home / name
+        if (candidate / "fennec_setup" / "provision.py").is_file():
+            return candidate
+    return home / "Fennec-Environment-Setup"
 
 
 def _git(args, cwd=None):
