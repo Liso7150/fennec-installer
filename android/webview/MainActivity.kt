@@ -21,8 +21,9 @@ class MainActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
         setContentView(webView)
-        // Point at the Termux-run engine or a LAN host.
-        val url = System.getenv("FENNEC_URL") ?: "http://127.0.0.1:8184"
+        // Point at the Termux-run Rust coding-agent backend (8787, fallback 8788)
+        // or a LAN host; FENNEC_URL overrides. The engine's own 8184 is not a UI.
+        val url = System.getenv("FENNEC_URL") ?: "http://127.0.0.1:8787"
         webView.loadUrl(url)
     }
 }
