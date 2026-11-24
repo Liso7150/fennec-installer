@@ -1,4 +1,4 @@
-![Fennec Installer 1.0.0 — one command to bootstrap the whole Fennec environment: pick a destination, choose features, fetch and provision, a thin shim over the environment-setup hub. Python 3.10+, 70 tests, Windows macOS Linux, MIT license.](docs/hero.png)
+![Fennec Installer 1.0.0 — one command to bootstrap the whole Fennec environment: pick a destination, choose features, fetch and provision, a thin shim over the environment-setup hub. Python 3.10+, 86 tests, Windows macOS Linux, MIT license.](docs/hero.png)
 
 ---
 
@@ -6,7 +6,7 @@
 
 | Tests | Entry scripts | Exclusive modes | Layout dirs | Features (hub manifest) |
 |:---:|:---:|:---:|:---:|:---:|
-| 70 in 3 files | 4 | 3 (+ `--build` / `--update`) | 5 | 10 |
+| 86 in 4 files | 4 | 3 (+ `--build` / `--update`) | 5 | 10 |
 
 Counts from `tests/`, the four scripts with a `__main__` entry and the hub's `repos.json`.
 Device detection, dependency installation, engine builds and checkout updates all live in the
@@ -27,8 +27,9 @@ reports nothing to fetch.
                             read-only   sources   deps + optional cargo build
 ```
 
-The installer never downloads models and never starts a server. Only public GitHub sources
-are fetched; nothing is uploaded.
+The installer never starts a server. Models are not downloaded by default; only explicit
+`--download-model` during `--install` fetches the recommended model. Only public GitHub
+sources are fetched otherwise; nothing is uploaded.
 
 ## Prerequisites
 
@@ -49,6 +50,7 @@ python install.py --all --yes                               # fetch everything
 python install.py --update --yes                            # update installed checkouts
 python install.py --install --features inference,desktop --yes
 python install.py --install --features inference --build --yes
+python install.py --install --features inference --download-model --yes
 python install.py --features browser-outlets --yes          # clone OpenBot, fill Fennec's own browser env
 python bootstrap.py --plan --all                            # read-only plan
 ```
@@ -76,6 +78,19 @@ python bootstrap.py --plan --all                            # read-only plan
 combined with `--fetch-only`. Installing provisions `python` on PATH and writes
 `~/.fennec/config.json` **only after every action succeeds**.
 
+### Recommended model
+
+Interactive installs that select core offer the recommended model before running actions;
+`--download-model` is the explicit noninteractive opt-in. Both download
+`Liso/qwen36-35b-colibri` (the Fennec-ready int4 container, up to **22.78 GiB**) only during `--install`, require a selected core
+checkout, install `fennec-core[models]`, and call the existing
+`setup_wizard.download_recommended_model` helper with the configured Python. The planned
+config and engine command use `<models_root>/qwen36-35b`.
+
+`--plan` and `--fetch-only` show the action but never run it. `--model` still selects an
+existing local model without downloading; combining it with `--download-model` is refused
+unless both name `<models_root>/qwen36-35b`.
+
 ### Overrides
 
 | Kind | Flags |
@@ -95,7 +110,7 @@ anything is downloaded:
 ```
 ROOT/engine   Fennec engine checkout (Rust; cargo build --release)
 ROOT/suite    suite sources: desktop, core, CLI, plugins, fine-tuning, optional outlets
-ROOT/models   model weights you add later (nothing is downloaded here)
+ROOT/models   model weights (optional --download-model)
 ROOT/cache    pip / Hugging Face caches
 ROOT/setup    environment setup hub used by this installer
 ```
@@ -199,7 +214,7 @@ app via `cargo build --release --offline` in
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v     # 70 checks across 3 files
+python -m unittest discover -s tests -v     # 86 checks across 4 files
 ```
 
 Hermetic: temporary directories and mocks, no network client calls, no downloads, no

@@ -3,26 +3,27 @@
 All notable changes to fennec-installer, the bootstrap shim and setup hub.
 
 The sections below carry the published tag each change actually shipped in
-(`Liso7150/fennec-installer`, `v0.1.0` … `v0.9.0`). An earlier revision of this
+(`Liso7150/fennec-installer`, `v0.1.0` … `v1.0.0`). An earlier revision of this
 file numbered the same history on a 1.x/2.x ladder that was never published;
 those tags still exist locally (`v1.2.0` … `v2.0.0`) and each one points at the
 same commit as a published `v0.x` tag. Dates are the tag publish dates.
 
-## [Unreleased] — 1.0.0 in preparation
-
-Nothing at 1.0.0 is published (`bootstrap.py` carries `VERSION = "1.0.0"`); the
-newest release here is `v0.9.0` (2026-11-11T19:29Z). Test counts come from the
+## [1.0.0] - 2026-11-24
+Version 1.0.0 is the current release.
+Test counts come from the
 results hub (`benchmarks/artifacts/hub/RESULTS.json`, updated
-2026-11-24T07:29:28Z): its `installer` lane runs
-`python -m unittest discover -s tests` and reports **70 passed / 0 failed / 0
-skipped** (measured 2026-11-24T05:47:01Z) — re-measured in this session with that
-same command: `Ran 70 tests … OK`. The hub's unittest parser reads `Ran N tests`
-and carries no subtest figure, so none is quoted here; the pytest run of the same
-tree gives `70 passed, 26 subtests passed`. An earlier revision of this file said
-50 passed plus 10 subtests, and that number was stale. Suite-wide totals live in
-the hub, not here.
+2026-11-24T13:27:28Z): its `installer` lane runs
+`python -m unittest discover -s tests` and reports **86 passed / 0 failed / 0
+skipped** after the supervised-core startup change (measured 2026-11-24). The hub's
+unittest parser reads `Ran N tests` and carries no subtest figure, so none is quoted
+here. An earlier revision of this file said 50 passed plus 10 subtests, and that
+number was stale. Suite-wide totals live in the hub, not here.
 
 ### Added
+- `--download-model`: explicit `--install` opt-in (also offered by interactive
+  installs) for the Fennec-ready `Liso/qwen36-35b-colibri` int4 container (22.78
+  GiB), installed through `fennec-core[models]` and the core's existing
+  `download_recommended_model` helper; plans and fetch-only never download it
 - `updater.py`: self-update from the GitHub releases of this repo, with
   `--experimental` polling the `main` branch instead of a tag
 - The setup hub resolves to the suite sibling checkout before falling back to
@@ -32,6 +33,10 @@ the hub, not here.
   the command line rather than only by editing `config.json`
 
 ### Changed
+- The core-supervised PWA/API is the front door on `127.0.0.1:8787`; the Rust
+  coding-agent service is optional and pinned to `127.0.0.1:8788`. Termux checks
+  all four required `/api/capabilities` features before opening the PWA and
+  cleans up the two same-named executables by their own PIDs (`4c50a70`)
 - Version 1.0.0; `install.py` stays the compatibility entry point and defaults to
   `--fetch-only`
 - `browser-outlets` installs Fennec's own browser venv beside the `--openbot-url`
@@ -40,6 +45,9 @@ the hub, not here.
   refusal, not a silently ignored setting
 
 ### Fixed
+- Stable updater downloads now require a valid exact-basename `SHA256SUMS`
+  entry and matching digest before staging; missing or malformed manifests fail
+  closed instead of installing unverified bytes
 - The bootstrap test assertion that no longer matched the bootstrap
 - `python updater.py --help` ran the update instead of describing it: the entry
   point tested only for `--experimental` and ignored every other argument, so a

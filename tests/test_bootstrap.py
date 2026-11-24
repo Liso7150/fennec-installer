@@ -161,6 +161,84 @@ class OutletFlagTests(unittest.TestCase):
         self.assertEqual(bootstrap.VERSION, "1.0.0")
 
 
+class RecommendedModelFlagTests(unittest.TestCase):
+    def fake_hub(self):
+        plan = object()
+        package = types.ModuleType("fennec_setup")
+        package.__path__ = []
+        package.load_manifest = mock.Mock(return_value={
+            "repos": [], "features": {"inference": {"description": "run the engine"}}})
+        config = types.ModuleType("fennec_setup.config")
+        config.KEYS = ()
+        provision = types.ModuleType("fennec_setup.provision")
+        provision.selected_features = mock.Mock(return_value=["inference"])
+        provision.plan_from_args = mock.Mock(return_value=plan)
+        provision.print_plan = mock.Mock()
+        provision.execute_plan = mock.Mock()
+        provision.update_installed = mock.Mock()
+        return {"fennec_setup": package, "fennec_setup.config": config,
+                "fennec_setup.provision": provision}, package, provision, plan
+
+    def invoke(self, argv, *, plan_error=None):
+        modules, package, provision, plan = self.fake_hub()
+        if plan_error:
+            provision.plan_from_args.side_effect = plan_error
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.dict(sys.modules, modules), \
+                mock.patch.object(bootstrap, "bootstrap_setup", return_value=package), \
+                mock.patch.object(bootstrap, "choose_destination", return_value=None), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = bootstrap.main([*argv, "--setup-home", str(ROOT / "unused-setup")])
+        return code, out.getvalue(), err.getvalue(), provision, plan
+
+    def test_download_model_is_an_explicit_opt_in(self):
+        self.assertFalse(bootstrap.parser().parse_args(["--plan", "--all"]).download_model)
+        args = bootstrap.parser().parse_args(["--plan", "--all", "--download-model"])
+        self.assertTrue(args.download_model)
+
+    def test_interactive_install_offers_the_recommended_model_only_with_core(self):
+        fetch = types.ModuleType("fennec_setup.fetch")
+        fetch.repos_for_features = lambda manifest, features: (
+            [{"concept": "core"}] if "core" in features else [])
+        with mock.patch.dict(sys.modules, {"fennec_setup.fetch": fetch}):
+            self.assertTrue(bootstrap.offer_recommended_model(
+                ["core"], {}, ask=lambda _: "y", echo=lambda _: None))
+            self.assertFalse(bootstrap.offer_recommended_model(
+                ["installer"], {}, ask=lambda _: "y", echo=lambda _: None))
+            self.assertFalse(bootstrap.offer_recommended_model(
+                ["core"], {}, interactive=False, ask=lambda _: "y", echo=lambda _: None))
+
+    def test_download_model_and_explicit_model_reach_the_hub(self):
+        code, _, err, provision, _ = self.invoke([
+            "--plan", "--features", "inference", "--download-model", "--model", "custom-model"])
+        self.assertEqual(code, 0, err)
+        passed = provision.plan_from_args.call_args.args[1]
+        self.assertTrue(passed.download_model)
+        self.assertEqual(passed.model, "custom-model")
+
+    def test_plan_and_fetch_only_never_execute_install_actions(self):
+        for mode in ("--plan", "--fetch-only"):
+            with self.subTest(mode=mode):
+                argv = [mode, "--features", "inference", "--download-model"]
+                if mode == "--fetch-only":
+                    argv.append("--yes")
+                code, _, err, provision, plan = self.invoke(argv)
+                self.assertEqual(code, 0, err)
+                self.assertTrue(provision.plan_from_args.call_args.args[1].download_model)
+                if mode == "--plan":
+                    provision.execute_plan.assert_not_called()
+                else:
+                    provision.execute_plan.assert_called_once_with(plan, install=False)
+
+    def test_hub_model_conflict_is_reported_without_execution(self):
+        code, _, err, provision, _ = self.invoke([
+            "--plan", "--features", "inference", "--download-model", "--model", "other-model"],
+            plan_error=ValueError("--model and --download-model select different models"))
+        self.assertEqual(code, 1)
+        self.assertIn("--model and --download-model select different models", err)
+        provision.execute_plan.assert_not_called()
+
+
 class DestinationTests(unittest.TestCase):
     def test_layout_covers_engine_suite_models_cache_setup(self):
         root = Path(tempfile.gettempdir()) / "fennec-layout"

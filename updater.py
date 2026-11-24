@@ -11,6 +11,7 @@ import urllib.request
 import json
 
 GITHUB_REPO = "Liso7150/fennec-installer"
+CHECKSUMS_ASSET = "SHA256SUMS"
 
 
 @dataclass
@@ -60,6 +61,38 @@ def is_newer(candidate, current):
     return left > right
 
 
+def _normalize_checksum(checksum: str) -> str:
+    if len(checksum) != 64 or any(char not in "0123456789abcdefABCDEF" for char in checksum):
+        raise ValueError("Checksum must be exactly 64 hexadecimal characters")
+    return checksum.lower()
+
+
+def checksum_for(checksums: str, asset_name: str) -> str:
+    """Return the validated lowercase digest for one exact asset basename."""
+    found = None
+    for number, line in enumerate(checksums.splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split()
+        if len(fields) != 2:
+            raise ValueError(f"Malformed {CHECKSUMS_ASSET} line {number}: expected two fields")
+        digest, filename = fields
+        if filename.startswith("*"):
+            filename = filename[1:]
+        try:
+            digest = _normalize_checksum(digest)
+        except ValueError as error:
+            raise ValueError(f"Malformed {CHECKSUMS_ASSET} line {number}: {error}") from error
+        if filename == asset_name:
+            if found is not None:
+                raise ValueError(f"Duplicate {CHECKSUMS_ASSET} entry for {asset_name}")
+            found = digest
+    if found is None:
+        raise ValueError(f"{CHECKSUMS_ASSET} has no entry for {asset_name}")
+    return found
+
+
 def check_stable(current_version: str) -> Optional[Release]:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
     try:
@@ -77,7 +110,7 @@ def check_stable(current_version: str) -> Optional[Release]:
         return None
     
     assets = [Asset(name=a["name"], download_url=a["browser_download_url"], size=a["size"]) for a in data.get("assets", [])]
-    checksums_url = next((a["browser_download_url"] for a in data.get("assets", []) if "checksum" in a["name"].lower()), None)
+    checksums_url = next((asset.download_url for asset in assets if asset.name == CHECKSUMS_ASSET), None)
     
     return Release(version=version, tag=tag, published_at=data.get("published_at", ""), assets=assets, checksums_url=checksums_url)
 
@@ -96,6 +129,11 @@ def check_experimental() -> Optional[Release]:
 
 
 def download_asset(url: str, expected_checksum: Optional[str] = None) -> bytes:
+    """Download bytes; binary callers must supply a valid SHA-256 digest.
+
+    A missing digest is allowed only for metadata such as SHA256SUMS itself.
+    """
+    expected = _normalize_checksum(expected_checksum) if expected_checksum is not None else None
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "fennec-updater"})
         with urllib.request.urlopen(req, timeout=300) as resp:
@@ -103,10 +141,10 @@ def download_asset(url: str, expected_checksum: Optional[str] = None) -> bytes:
     except Exception as e:
         raise Exception(f"Download: {e}")
     
-    if expected_checksum:
+    if expected is not None:
         actual = hashlib.sha256(data).hexdigest()
-        if actual != expected_checksum:
-            raise Exception(f"Checksum mismatch: expected {expected_checksum}, got {actual}")
+        if actual != expected:
+            raise Exception(f"Checksum mismatch: expected {expected}, got {actual}")
     
     return data
 
@@ -137,7 +175,14 @@ def update(experimental: bool = False) -> str:
             return f"No asset for platform: {name}"
         
         print(f"[update] Downloading {name}...")
-        data = download_asset(asset.download_url)
+        if not release.checksums_url:
+            raise RuntimeError(f"Release is missing {CHECKSUMS_ASSET}")
+        try:
+            checksum_data = download_asset(release.checksums_url).decode("utf-8")
+        except Exception as error:
+            raise RuntimeError(f"Download {CHECKSUMS_ASSET}: {error}") from error
+        checksum = checksum_for(checksum_data, name)
+        data = download_asset(asset.download_url, checksum)
         
         current_exe = Path(sys.executable if hasattr(sys, 'frozen') else __file__)
         temp_path = current_exe.with_suffix(current_exe.suffix + ".new")

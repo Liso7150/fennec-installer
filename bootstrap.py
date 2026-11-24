@@ -15,7 +15,7 @@ ROOT_SUBDIRS = ("engine", "suite", "models", "cache", "setup")
 LAYOUT_HELP = {
     "engine": "Fennec engine checkout (Rust; cargo build --release)",
     "suite": "suite sources: desktop, core, CLI, plugins, fine-tuning",
-    "models": "model weights you add later (nothing is downloaded here)",
+    "models": "model weights (optional --download-model)",
     "cache": "pip / Hugging Face caches",
     "setup": "environment setup hub used by this installer",
 }
@@ -145,7 +145,7 @@ def choose_destination(value=None, assume_yes=False, *, interactive=None, home=N
         free = _free_gib(chosen)
         if free is not None:
             echo(f"  free on this volume: {free:.1f} GiB")
-        echo("Repositories are downloaded from GitHub; no models are downloaded and nothing is uploaded.\n")
+        echo("Repositories are downloaded from GitHub; models download only with explicit --download-model, and nothing is uploaded.\n")
         if ask("Use this destination? [Y/n] ").strip().lower() in ("", "y", "yes"):
             return chosen
 
@@ -238,6 +238,19 @@ def choose_features(cs, preselected, assume_yes, *, all_features=False, recommen
     return list(dict.fromkeys(chosen))
 
 
+def offer_recommended_model(features, manifest, *, interactive=None, ask=input, echo=print):
+    if interactive is None:
+        interactive = sys.stdin.isatty()
+    if not interactive:
+        return False
+    from fennec_setup.fetch import repos_for_features
+    if not any(repo["concept"] == "core" for repo in repos_for_features(manifest, features)):
+        return False
+    echo("\nRecommended model: Liso/qwen36-35b-colibri (Fennec-ready int4, up to 22.78 GiB).")
+    echo("It downloads only during this install and is selected after completeness checks.")
+    return ask("Download the recommended model? [y/N]: ").strip().lower() in ("y", "yes")
+
+
 VERSION = "1.0.0"
 
 
@@ -249,6 +262,8 @@ def parser():
     mode.add_argument("--fetch-only", action="store_true", help="sources only, no installs/config writes")
     mode.add_argument("--install", action="store_true", help="fetch and install selected dependencies")
     ap.add_argument("--build", action="store_true", help="install and build the engine (cargo build --release), or include the build in --plan")
+    ap.add_argument("--download-model", action="store_true",
+                    help="during --install, download the Fennec-ready qwen36-35b int4 model (22.78 GiB) through fennec-core")
     selection = ap.add_mutually_exclusive_group()
     selection.add_argument("--features")
     selection.add_argument("--all", action="store_true")
@@ -328,6 +343,8 @@ def main(argv=None):
                     return manifest
             features = choose_features(MenuSetup, None, args.yes,
                                        recommendations=cs.recommend(cs.detect())["features"])
+        if args.install and not args.download_model and not args.model:
+            args.download_model = offer_recommended_model(features, manifest)
         plan = plan_from_args(manifest, args, features)
         if args.root and not args.json:
             print(f"Destination: {args.root} - repositories, venv, models and caches stay on this device")
