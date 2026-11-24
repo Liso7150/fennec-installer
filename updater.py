@@ -37,6 +37,29 @@ def get_platform() -> tuple[str, str]:
     return os_name, arch
 
 
+def is_newer(candidate, current):
+    """`True` only when candidate is a strictly newer dotted version.
+
+    A string compare ranks 1.9.0 above 1.10.0, and the published releases run
+    *behind* a working tree, so a 1.0.0 checkout must not pull 0.9.0 assets just
+    because the tag differs. Returns `None` when either side is not three plain
+    numbers, and the caller refuses to guess.
+    """
+    def parts(version):
+        fields = str(version).strip().lstrip("v").split(".")
+        if len(fields) != 3:
+            return None
+        try:
+            return tuple(int(field) for field in fields)
+        except ValueError:
+            return None
+
+    left, right = parts(candidate), parts(current)
+    if left is None or right is None:
+        return None
+    return left > right
+
+
 def check_stable(current_version: str) -> Optional[Release]:
     url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
     try:
@@ -50,7 +73,7 @@ def check_stable(current_version: str) -> Optional[Release]:
     
     tag = data.get("tag_name", "")
     version = tag.lstrip("v")
-    if version <= current_version:
+    if is_newer(version, current_version) is not True:
         return None
     
     assets = [Asset(name=a["name"], download_url=a["browser_download_url"], size=a["size"]) for a in data.get("assets", [])]
@@ -124,6 +147,10 @@ def update(experimental: bool = False) -> str:
 
 
 if __name__ == "__main__":
+    if {"-h", "--help"} & set(sys.argv[1:]):
+        print("usage: python updater.py [--experimental]")
+        print("  --experimental  check the main branch instead of the latest release")
+        raise SystemExit(0)
     experimental = "--experimental" in sys.argv
     try:
         result = update(experimental)
